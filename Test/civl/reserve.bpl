@@ -42,6 +42,8 @@ axiom (forall X: [int]bool, x: int :: !X[x] ==> X[x:=false] == X);
 axiom (forall X: [int]bool, x: int :: Size(X[x := false]) + 1 == Size(X[x := true]));
 axiom (forall X, Y: [int]bool :: Subset(X, Y) ==> Size(X) < Size(Y) || X == Y);
 
+////////////////////////////////////////////////////////////////////////////////
+
 function {:inline} Invariant(NumFreeAtOrAfter: [int]int, AllocatingAtOrAfter: [int][X]bool, Free: [int]bool, freeSpace: int) : (bool)
 {
     Size(AllocatingAtOrAfter[memLo]) + freeSpace == NumFreeAtOrAfter[memLo] &&
@@ -52,61 +54,25 @@ function {:inline} Invariant(NumFreeAtOrAfter: [int]int, AllocatingAtOrAfter: [i
     (forall u: int :: {memAddr(u)} memAddr(u) ==> NumFreeAtOrAfter[u] == (NumFreeAtOrAfter[u+1] + (if Free[u] then 1 else 0)))
 }
 
-procedure {:yields} {:layer 0,1} DecrementFreeSpace({:cnst "tid"} tid: X);
-ensures {:atomic} |{ A:   assert AllocatingAtOrAfter[memLo] == AllocatingAtOrAfter[memLo][tid := false];
-                          assume 0 < freeSpace;
-                          freeSpace := freeSpace - 1;
-                          AllocatingAtOrAfter[memLo][tid] := true;
-                          return true; }|;
+procedure {:yield_invariant} {:layer 1} YieldAlloc({:linear "tid"} tid:int, i: int);
+requires mutatorAddr(tid);
+requires Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
+requires (forall u: int :: AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= i);
+// potential trigger: {AllocatingAtOrAfter[u][tid]}
 
-procedure {:yields} {:layer 0,1} AllocIfPtrFree({:cnst "tid"} tid:int, ptr:int) returns (spaceFound:bool);
-ensures {:atomic} |{
-    A: assert memAddr(ptr);
-       assert Free[ptr] || memAddr(ptr + 1);
-       assert (forall u: int :: AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= ptr);
-       spaceFound := Free[ptr];
-       goto B, C;
-    B: assume (spaceFound);
-       Free[ptr] := false;
-       NumFreeAtOrAfter := (lambda u: int :: NumFreeAtOrAfter[u] - (if memLo <= u && u <= ptr then 1 else 0));
-       AllocatingAtOrAfter := (lambda u: int :: AllocatingAtOrAfter[u][tid := false]);
-       return true;
-    C: assume (!spaceFound);
-       AllocatingAtOrAfter[ptr+1][tid] := true;
-       return true; }|;
+procedure {:yield_invariant} {:layer 1} YieldCollect({:linear "tid"} tid: X);
+requires tid == GcTid;
+requires Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
 
-procedure {:yields} {:layer 0,1} Reclaim({:cnst "tid"} tid:int);
-ensures {:atomic} |{ var ptr: int;
-    A: assume memAddr(ptr) && !Free[ptr];
-       freeSpace := freeSpace + 1;
-       Free[ptr] := true;
-       NumFreeAtOrAfter := (lambda u: int :: NumFreeAtOrAfter[u] + (if memLo <= u && u <= ptr then 1 else 0));
-       return true; }|;
+////////////////////////////////////////////////////////////////////////////////
 
-procedure {:yields} {:layer 1} YieldAlloc({:cnst "tid"} tid:int, i: int)
-requires {:layer 1} mutatorAddr(tid);
-requires {:expand} {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-requires {:layer 1} (forall u: int :: AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= i);
-ensures {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-ensures {:layer 1} (forall u: int :: AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= i);
-{
-    yield;
-    assert {:layer 1} mutatorAddr(tid);
-    assert {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-    assert {:layer 1} (forall u: int :: {AllocatingAtOrAfter[u][tid]} AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= i);
-}
-
-procedure {:yields} {:layer 1} Malloc({:cnst "tid"} tid: X)
-requires {:layer 1} mutatorAddr(tid);
-requires {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-requires {:layer 1} (forall u: int :: !AllocatingAtOrAfter[u][tid]);
-ensures {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-ensures {:layer 1} (forall u: int :: !AllocatingAtOrAfter[u][tid]);
+procedure {:yields} {:layer 1}
+{:yield_requires "YieldAlloc", tid, 0}
+{:yield_ensures  "YieldAlloc", tid, 0}
+Alloc({:linear "tid"} tid: X)
 {
     var i: int;
     var spaceFound: bool;
-
-    call YieldAlloc(tid, 0);
 
     assert {:layer 1} memAddr(memLo) ==> (forall v: int :: memAddr(v) && memLo <= v ==> Subset(AllocatingAtOrAfter[v], AllocatingAtOrAfter[memLo]));
     assert {:layer 1} memAddr(memLo) ==> (forall v: int :: memAddr(v) && v <= memLo ==> Subset(AllocatingAtOrAfter[memLo], AllocatingAtOrAfter[v]));
@@ -114,12 +80,9 @@ ensures {:layer 1} (forall u: int :: !AllocatingAtOrAfter[u][tid]);
     call DecrementFreeSpace(tid);
     i := memLo;
 
-    call YieldAlloc(tid, i);
-
     while (i < memHi)
+    invariant {:layer 1}{:yields}{:yield_loop "YieldAlloc", tid, i} true;
     invariant {:layer 1} memAddr(i);
-    invariant {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-    invariant {:layer 1} (forall u: int :: AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= i);
     {
         assert {:layer 1} memAddr(i+1) ==> (forall v: int :: memAddr(v) && i+1 <= v ==> Subset(AllocatingAtOrAfter[v], AllocatingAtOrAfter[i+1]));
         assert {:layer 1} memAddr(i+1) ==> (forall v: int :: memAddr(v) && v <= i+1 ==> Subset(AllocatingAtOrAfter[i+1], AllocatingAtOrAfter[v]));
@@ -128,42 +91,69 @@ ensures {:layer 1} (forall u: int :: !AllocatingAtOrAfter[u][tid]);
 
         if (spaceFound)
         {
-            call YieldAlloc(tid, 0);
             return;
         }
         else
         {
             i := i + 1;
         }
-        call YieldAlloc(tid, i);
     }
 
-    yield;
     assert {:layer 1} false;
 }
 
-procedure {:yields} {:layer 1} YieldCollect({:cnst "tid"} tid: X)
-requires {:layer 1} tid == GcTid;
-requires {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-ensures {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
+procedure {:yields} {:layer 1}
+{:yield_requires "YieldCollect", tid}
+{:yield_ensures  "YieldCollect", tid}
+Collect({:linear "tid"} tid: X)
 {
-    yield;
-    assert {:layer 1} tid == GcTid;
-    assert {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-}
-
-procedure {:yields} {:layer 1} Collect({:cnst "tid"} tid: X)
-requires {:layer 1} tid == GcTid;
-requires {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-ensures {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
-{
-    call YieldCollect(tid);
-
     while (*)
-    invariant {:layer 1} Invariant(NumFreeAtOrAfter, AllocatingAtOrAfter, Free, freeSpace);
+    invariant {:layer 1}{:yields}{:yield_loop "YieldCollect", tid} true;
     {
         call Reclaim(tid);
-        call YieldCollect(tid);
     }
-    call YieldCollect(tid);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+procedure {:atomic} {:layer 1} AtomicDecrementFreeSpace({:linear "tid"} tid: X)
+modifies freeSpace, AllocatingAtOrAfter;
+{
+    assert AllocatingAtOrAfter[memLo] == AllocatingAtOrAfter[memLo][tid := false];
+    assume 0 < freeSpace;
+    freeSpace := freeSpace - 1;
+    AllocatingAtOrAfter[memLo][tid] := true;
+}
+
+procedure {:atomic} {:layer 1} AtomicAllocIfPtrFree({:linear "tid"} tid:int, ptr:int) returns (spaceFound:bool)
+modifies Free, NumFreeAtOrAfter, AllocatingAtOrAfter;
+{
+    assert memAddr(ptr);
+    assert Free[ptr] || memAddr(ptr + 1);
+    assert (forall u: int :: AllocatingAtOrAfter[u][tid] <==> memLo <= u && u <= ptr);
+    spaceFound := Free[ptr];
+    if (spaceFound)
+    {
+        Free[ptr] := false;
+        NumFreeAtOrAfter := (lambda u: int :: NumFreeAtOrAfter[u] - (if memLo <= u && u <= ptr then 1 else 0));
+        AllocatingAtOrAfter := (lambda u: int :: AllocatingAtOrAfter[u][tid := false]);
+    }
+    else
+    {
+        AllocatingAtOrAfter[ptr+1][tid] := true;
+    }
+}
+
+procedure {:atomic} {:layer 1} AtomicReclaim({:linear "tid"} tid:int)
+modifies freeSpace, Free, NumFreeAtOrAfter;
+{
+    var ptr: int;
+    assume memAddr(ptr) && !Free[ptr];
+    freeSpace := freeSpace + 1;
+    Free[ptr] := true;
+    NumFreeAtOrAfter := (lambda u: int :: NumFreeAtOrAfter[u] + (if memLo <= u && u <= ptr then 1 else 0));
+}
+
+procedure {:yields} {:layer 0} {:refines "AtomicDecrementFreeSpace"} DecrementFreeSpace({:linear "tid"} tid: X);
+procedure {:yields} {:layer 0} {:refines "AtomicAllocIfPtrFree"} AllocIfPtrFree({:linear "tid"} tid:int, ptr:int) returns (spaceFound:bool);
+procedure {:yields} {:layer 0} {:refines "AtomicReclaim"} Reclaim({:linear "tid"} tid:int);
