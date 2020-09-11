@@ -55,8 +55,6 @@ ensures b == (exists i: int :: 0 <= i && i < IntSeqLen(s) && x == IntSeqNth(s, i
 }
 */
 
-function foo(s: IntSeq, x: int):int;
-
 procedure test1(s: IntSeq, x: int)
 requires 0 <= x && x < IntSeqLen(s);
 requires (forall i: int :: 0 <= i && i < IntSeqLen(s) ==> IntSeqNth(s, i) == 0);
