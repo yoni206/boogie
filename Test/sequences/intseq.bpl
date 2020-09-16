@@ -8,7 +8,10 @@ function {:builtin "seq.++"} IntSeqConcat(s1: IntSeq, s2:IntSeq): IntSeq;
 function {:builtin "seq.unit"} IntSeqUnit(i: int): IntSeq;
 function {:builtin "seq.nth"} IntSeqNth(s: IntSeq, i: int): int;
 function {:builtin "seq.extract"} IntSeqExtract(s: IntSeq, pos: int, len: int): IntSeq;
-
+function Nth(s: IntSeq, i: int): int
+{
+  IntSeqNth(s, i)
+}
 function {:inline} IntSeqUpdate(s: IntSeq, i: int, v: int): IntSeq {
   if (0 <= i && i < IntSeqLen(s))
   then
@@ -17,13 +20,11 @@ function {:inline} IntSeqUpdate(s: IntSeq, i: int, v: int): IntSeq {
   else
     s
 }
-
 function {:inline} IntSeqAppend(s:IntSeq, v: int): IntSeq {
   IntSeqConcat(s, IntSeqUnit(v))
 }
 
-/*
-procedure test()
+procedure test0()
 {
   var s: IntSeq;
 
@@ -32,75 +33,93 @@ procedure test()
   s := IntSeqConcat(s, IntSeqUnit(2));
   assert IntSeqLen(s) == 3;
   assert IntSeqExtract(s, 1, 2) == IntSeqConcat(IntSeqUnit(1), IntSeqUnit(2));
-  assert IntSeqNth(s, 1) == 1;
+  assert Nth(s, 1) == 1;
+  s := IntSeqUpdate(s, 1, 3);
+  assert Nth(s, 0) == 0;
+  assert Nth(s, 1) == 3;
+  assert IntSeqLen(s) == 3;
 }
-
-procedure lookup(s: IntSeq, x: int) returns (b: bool)
-ensures b == (exists i: int :: 0 <= i && i < IntSeqLen(s) && x == IntSeqNth(s, i));
-{
-  var i: int;
-
-  b := false;
-  i := 0;
-  while (i < IntSeqLen(s))
-  invariant (forall u: int :: 0 <= u && u < i ==> x != IntSeqNth(s, u));
-  invariant 0 <= i;
-  {
-    if (IntSeqNth(s, i) == x) {
-      b := true;
-      return;
-    }
-    i := i + 1;
-  }
-}
-*/
 
 procedure test1(s: IntSeq, x: int)
 requires 0 <= x && x < IntSeqLen(s);
-requires (forall i: int :: 0 <= i && i < IntSeqLen(s) ==> IntSeqNth(s, i) == 0);
-ensures IntSeqNth(s, x) == 0;
+requires (forall i: int :: 0 <= i && i < IntSeqLen(s) ==> Nth(s, i) == 0);
+ensures Nth(s, x) == 0;
 {
 
 }
 
 procedure test2(s: IntSeq, x: int, y: int)
 requires 0 <= x && x <= y && y < IntSeqLen(s);
-requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> IntSeqNth(s, i) <= IntSeqNth(s, j));
-ensures IntSeqNth(s, x) <= IntSeqNth(s, y);
+requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
+ensures Nth(s, x) <= Nth(s, y);
 {
 
 }
 
-/*
+procedure lookup(s: IntSeq, x: int) returns (b: bool)
+ensures b == (exists i: int :: 0 <= i && i < IntSeqLen(s) && x == Nth(s, i));
+{
+  var i: int;
+
+  b := false;
+  i := 0;
+  while (i < IntSeqLen(s))
+  invariant (forall u: int :: 0 <= u && u < i ==> x != Nth(s, u));
+  invariant 0 <= i;
+  {
+    if (Nth(s, i) == x) {
+      b := true;
+      return;
+    }
+    i := i + 1;
+  }
+}
+
+procedure sorted_update(s: IntSeq, pos: int, val: int) returns (s': IntSeq)
+requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
+requires 0 <= pos && pos < IntSeqLen(s);
+requires (forall i: int:: 0 <= i && i < pos ==> Nth(s, i) <= val);
+requires (forall i: int :: pos < i && i < IntSeqLen(s) ==> val <= Nth(s, i));
+ensures (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s') ==> Nth(s', i) <= Nth(s', j));
+{
+  s' := IntSeqUpdate(s, pos, val);
+  assert IntSeqLen(s) == IntSeqLen(s');
+  assert (forall i: int :: 0 <= i && i < IntSeqLen(s) && i != pos ==> Nth(s, i) == Nth(s', i));
+}
+
 procedure sorted_insert(s: IntSeq, x: int) returns (s': IntSeq)
-requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> IntSeqNth(s, i) <= IntSeqNth(s, j));
-ensures (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> IntSeqNth(s, i) <= IntSeqNth(s, j));
+requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
+ensures (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
 {
   var pos: int;
   var val: int;
+  var new_val: int;
 
   pos := 0;
-  while (pos < IntSeqLen(s))
+  while (pos < IntSeqLen(s) && Nth(s, pos) <= x)
   invariant 0 <= pos;
-  invariant (forall i: int:: 0 <= i && i < pos ==> IntSeqNth(s, i) <= x);
+  invariant (forall i: int:: 0 <= i && i < pos ==> Nth(s, i) <= x);
   {
-    if (IntSeqNth(s, pos) > x) {
-      break;
-    }
     pos := pos + 1;
   }
 
-  assert (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> IntSeqNth(s, i) <= IntSeqNth(s, j)); assume false;
+  assert (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
+  assert (forall i: int :: pos <= i && i < IntSeqLen(s) ==> x <= Nth(s, i)); //assume false;
 
   val := x;
   s' := s;
-  while (pos < IntSeqLen(s))
+  while (pos < IntSeqLen(s'))
   invariant 0 <= pos;
-  invariant (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s') ==> IntSeqNth(s', i) <= IntSeqNth(s', j));
+  invariant (forall i: int:: 0 <= i && i < pos ==> Nth(s', i) <= val);
+  invariant (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s') ==> Nth(s', i) <= Nth(s', j));
+  invariant (forall i: int :: pos <= i && i < IntSeqLen(s') ==> val <= Nth(s', i));
   {
-    s', val := IntSeqUpdate(s', pos, val), IntSeqNth(s', pos); // swap s'[pos] and val
+    //s', val := IntSeqUpdate(s', pos, val), Nth(s', pos); // swap s'[pos] and val
+    new_val := Nth(s', pos);
+    s' := IntSeqUpdate(s', pos, val);
+    assert Nth(s', pos) == val;
+    val := new_val;
     pos := pos + 1;
   }
   s' := IntSeqAppend(s', val);
 }
-*/
