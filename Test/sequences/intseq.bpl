@@ -85,6 +85,22 @@ ensures b == (exists i: int :: 0 <= i && i < IntSeqLen(s) && x == Nth(s, i));
   }
 }
 
+procedure equality(s: IntSeq, s': IntSeq)
+requires IntSeqLen(s) == IntSeqLen(s');
+requires (forall i, j: int :: 0 <= i && j < IntSeqLen(s) ==> IntSeqNth(s, i) == IntSeqNth(s', i));
+ensures s == s';
+{
+
+}
+
+procedure update(s: IntSeq, pos: int, val: int) returns (s': IntSeq)
+requires 0 <= pos && pos < IntSeqLen(s);
+requires Nth(s, pos) == val;
+ensures s' == s;
+{
+  s' := IntSeqUpdate(s, pos, val);
+}
+
 procedure sorted_update(s: IntSeq, pos: int, val: int) returns (s': IntSeq)
 requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
 requires 0 <= pos && pos < IntSeqLen(s);
