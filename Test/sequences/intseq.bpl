@@ -74,7 +74,7 @@ ensures b == (exists i: int :: 0 <= i && i < IntSeqLen(s) && x == Nth(s, i));
     i := i + 1;
   }
 }
-
+/*
 procedure sorted_update(s: IntSeq, pos: int, val: int) returns (s': IntSeq)
 requires (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) <= Nth(s, j));
 requires 0 <= pos && pos < IntSeqLen(s);
@@ -123,3 +123,4 @@ ensures (forall i, j: int :: 0 <= i && i <= j && j < IntSeqLen(s) ==> Nth(s, i) 
   }
   s' := IntSeqAppend(s', val);
 }
+*/
