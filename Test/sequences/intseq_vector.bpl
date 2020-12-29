@@ -30,26 +30,36 @@ function {:builtin "(as seq.empty (Seq Int))"} Empty(): Vec;
 //   Vec(contents#Vec(v)[len#Vec(v) := x], len#Vec(v) + 1)
 // }
 function {:builtin "seq.++"} Concat(v: Vec, w: Vec) : Vec;
+function {:builtin "seq.++"} Concat3(v: Vec, w: Vec, u: Vec): Vec;
 function {:builtin "seq.unit"} Unit(i: int) : Vec;
-function {:inline} Append(v: Vec, x: int) : Vec T { Concat(v, Unit(x)) }
+function {:inline} Append(v: Vec, x: int) : Vec { Concat(v, Unit(x)) }
 
-function {:inline} Update<T>(v: Vec T, i: int, x: T) : Vec T
+// function {:inline} Update<T>(v: Vec T, i: int, x: T) : Vec T
+// {
+//    if (0 <= i && i < len#Vec(v)) then Vec(contents#Vec(v)[i := x], len#Vec(v)) else v
+// }
+function {:builtin "seq.extract"} Extract(v: Vec, offset: int, length: int): Vec;
+function {:inline} Update(v: Vec, i: int, x: int): Vec
 {
-   if (0 <= i && i < len#Vec(v)) then Vec(contents#Vec(v)[i := x], len#Vec(v)) else v
+  Concat3(Extract(v, 0, i), Unit(x), Extract(v, i+1, Len(v) - i - 1))
 }
 
-function {:inline} Nth<T>(v: Vec T, i: int): T
-{
-  contents#Vec(v)[i]
-}
-function {:inline} Len<T>(v: Vec T): int
-{
-  len#Vec(v)
-}
+// function {:inline} Nth<T>(v: Vec T, i: int): T
+// {
+//   contents#Vec(v)[i]
+// }
+function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
+
+// function {:inline} Len<T>(v: Vec T): int
+// {
+//   len#Vec(v)
+// }
+function {:builtin "seq.len"} Len(v: Vec): int;
 
 procedure test0()
 {
-  var s: Vec int;
+  // var s: Vec int;
+  var s: Vec;
 
   s := Append(Empty(), 0);
   s := Append(s, 1);
@@ -62,21 +72,24 @@ procedure test0()
   assert Len(s) == 3;
 }
 
-procedure test1(s: Vec int, x: int)
+// procedure test1(s: Vec int, x: int)
+procedure test1(s: Vec, x: int)
 requires 0 <= x && x < Len(s);
 requires (forall i: int :: 0 <= i && i < Len(s) ==> Nth(s, i) == 0);
 ensures Nth(s, x) == 0;
 {
 }
 
-procedure test2(s: Vec int, x: int, y: int)
+// procedure test2(s: Vec int, x: int, y: int)
+procedure test2(s: Vec, x: int, y: int)
 requires 0 <= x && x <= y && y < Len(s);
 requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
 ensures Nth(s, x) <= Nth(s, y);
 {
 }
 
-procedure lookup(s: Vec int, x: int) returns (b: bool)
+// procedure lookup(s: Vec int, x: int) returns (b: bool)
+procedure lookup(s: Vec, x: int) returns (b: bool)
 ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
 {
   var i: int;
@@ -95,14 +108,16 @@ ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
   }
 }
 
-procedure equality(s: Vec int, s': Vec int)
+// procedure equality(s: Vec int, s': Vec int)
+procedure equality(s: Vec, s': Vec)
 requires Len(s) == Len(s');
 requires (forall i: int :: 0 <= i && i < Len(s) ==> Nth(s, i) == Nth(s', i));
 ensures s == s';
 {
 }
 
-procedure update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+// procedure update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+procedure update(s: Vec, pos: int, val: int) returns (s': Vec)
 requires 0 <= pos && pos < Len(s);
 requires Nth(s, pos) == val;
 ensures s' == s;
@@ -110,7 +125,8 @@ ensures s' == s;
   s' := Update(s, pos, val);
 }
 
-procedure sorted_update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+// procedure sorted_update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+procedure sorted_update(s: Vec, pos: int, val: int) returns (s': Vec)
 requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
 requires 0 <= pos && pos < Len(s);
 requires (forall i: int:: 0 <= i && i < pos ==> Nth(s, i) <= val);
@@ -120,7 +136,8 @@ ensures (forall i, j: int :: 0 <= i && i <= j && j < Len(s') ==> Nth(s', i) <= N
   s' := Update(s, pos, val);
 }
 
-procedure sorted_insert(s: Vec int, x: int) returns (s': Vec int)
+// procedure sorted_insert(s: Vec int, x: int) returns (s': Vec int)
+procedure sorted_insert(s: Vec, x: int) returns (s': Vec)
 requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
 ensures (forall i, j: int :: 0 <= i && i <= j && j < Len(s') ==> Nth(s', i) <= Nth(s', j));
 {
@@ -149,51 +166,51 @@ ensures (forall i, j: int :: 0 <= i && i <= j && j < Len(s') ==> Nth(s', i) <= N
   s' := Append(s', val);
 }
 
-type {:datatype} Value;
-function {:constructor} Integer(i: int): Value;
-function {:constructor} Vector(v: Vec Value): Value;
-
-procedure test3(val: Value) returns (val': Value)
-requires is#Vector(val) && Len(v#Vector(val)) == 1 && Nth(v#Vector(val), 0) == Integer(0);
-ensures val == val';
-{
-  var s: Vec Value;
-
-  s := Empty();
-  s := Append(s, Integer(0));
-  val' := Vector(s);
-}
-
-function has_zero(val: Value): (bool)
-{
-  if (is#Integer(val))
-  then val == Integer(0)
-  else (exists i: int :: 0 <= i && i < Len(v#Vector(val)) && has_zero(Nth(v#Vector(val), i)))
-}
-
-procedure traverse(val: Value) returns (b: bool)
-ensures b == has_zero(val);
-{
-  var s: Vec Value;
-  var i: int;
-
-  b := false;
-  if (is#Integer(val)) {
-      b := val == Integer(0);
-      return;
-  }
-  s := v#Vector(val);
-  i := 0;
-  while (i < Len(s))
-  invariant !b;
-  invariant 0 <= i;
-  invariant (forall j: int :: 0 <= j && j < i ==> !has_zero(Nth(s, j)));
-  {
-    call b := traverse(Nth(s, i));
-    if (b) {
-        return;
-    }
-    assert !has_zero(Nth(s, i));
-    i := i + 1;
-  }
-}
+// type {:datatype} Value;
+// function {:constructor} Integer(i: int): Value;
+// function {:constructor} Vector(v: Vec Value): Value;
+// 
+// procedure test3(val: Value) returns (val': Value)
+// requires is#Vector(val) && Len(v#Vector(val)) == 1 && Nth(v#Vector(val), 0) == Integer(0);
+// ensures val == val';
+// {
+//   var s: Vec Value;
+// 
+//   s := Empty();
+//   s := Append(s, Integer(0));
+//   val' := Vector(s);
+// }
+// 
+// function has_zero(val: Value): (bool)
+// {
+//   if (is#Integer(val))
+//   then val == Integer(0)
+//   else (exists i: int :: 0 <= i && i < Len(v#Vector(val)) && has_zero(Nth(v#Vector(val), i)))
+// }
+// 
+// procedure traverse(val: Value) returns (b: bool)
+// ensures b == has_zero(val);
+// {
+//   var s: Vec Value;
+//   var i: int;
+// 
+//   b := false;
+//   if (is#Integer(val)) {
+//       b := val == Integer(0);
+//       return;
+//   }
+//   s := v#Vector(val);
+//   i := 0;
+//   while (i < Len(s))
+//   invariant !b;
+//   invariant 0 <= i;
+//   invariant (forall j: int :: 0 <= j && j < i ==> !has_zero(Nth(s, j)));
+//   {
+//     call b := traverse(Nth(s, i));
+//     if (b) {
+//         return;
+//     }
+//     assert !has_zero(Nth(s, i));
+//     i := i + 1;
+//   }
+// }
