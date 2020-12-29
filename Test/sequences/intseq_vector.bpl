@@ -1,34 +1,43 @@
 // RUN: %boogie -useArrayTheory -lib -monomorphize "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
-type {:datatype} Vec _;
-function {:constructor} Vec<T>(contents: [int]T, len: int): Vec T;
-function Default<T>(): T;
+//type {:datatype} Vec _;
+type {:builtin "(Seq Int)"} Vec;
 
-const Identity: [int]int;
-axiom (forall x: int :: Identity[x] == x);
-function {:inline} AtLeast(x: int): [int]bool
-{
-  MapLe(MapConst(x), Identity)
-}
-function {:inline} Range(from: int, n: int): [int]bool {
-  MapDiff(AtLeast(from), AtLeast(from + n))
-}
-axiom {:ctor "Vec"} (forall<T> x: Vec T :: {len#Vec(x)}{contents#Vec(x)} MapIte(Range(0, len#Vec(x)), MapConst(Default()), contents#Vec(x)) == MapConst(Default()));
-axiom {:ctor "Vec"} (forall<T> x: Vec T :: {len#Vec(x)} len#Vec(x) >= 0);
+// function {:constructor} Vec<T>(contents: [int]T, len: int): Vec T;
+// function Default<T>(): T;
 
-function {:inline} Empty<T>(): Vec T
-{
-  Vec(MapConst(Default()), 0)
-}
-function {:inline} Append<T>(v: Vec T, x: T) : Vec T
-{
-  Vec(contents#Vec(v)[len#Vec(v) := x], len#Vec(v) + 1)
-}
+// const Identity: [int]int;
+// axiom (forall x: int :: Identity[x] == x);
+// function {:inline} AtLeast(x: int): [int]bool
+// {
+//   MapLe(MapConst(x), Identity)
+// }
+// function {:inline} Range(from: int, n: int): [int]bool {
+//   MapDiff(AtLeast(from), AtLeast(from + n))
+// }
+// axiom {:ctor "Vec"} (forall<T> x: Vec T :: {len#Vec(x)}{contents#Vec(x)} MapIte(Range(0, len#Vec(x)), MapConst(Default()), contents#Vec(x)) == MapConst(Default()));
+// axiom {:ctor "Vec"} (forall<T> x: Vec T :: {len#Vec(x)} len#Vec(x) >= 0);
+
+// function {:inline} Empty<T>(): Vec T
+// {
+//   Vec(MapConst(Default()), 0)
+// }
+function {:builtin "(as seq.empty (Seq Int))"} Empty(): Vec;
+
+// function {:inline} Append<T>(v: Vec T, x: T) : Vec T
+// {
+//   Vec(contents#Vec(v)[len#Vec(v) := x], len#Vec(v) + 1)
+// }
+function {:builtin "seq.++"} Concat(v: Vec, w: Vec) : Vec;
+function {:builtin "seq.unit"} Unit(i: int) : Vec;
+function {:inline} Append(v: Vec, x: int) : Vec T { Concat(v, Unit(x)) }
+
 function {:inline} Update<T>(v: Vec T, i: int, x: T) : Vec T
 {
-  if (0 <= i && i < len#Vec(v)) then Vec(contents#Vec(v)[i := x], len#Vec(v)) else v
+   if (0 <= i && i < len#Vec(v)) then Vec(contents#Vec(v)[i := x], len#Vec(v)) else v
 }
+
 function {:inline} Nth<T>(v: Vec T, i: int): T
 {
   contents#Vec(v)[i]
