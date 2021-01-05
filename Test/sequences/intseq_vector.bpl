@@ -23,11 +23,12 @@ function {:builtin "seq.unit"} Unit(i: int) : Vec;
 // sub-sequence (extract)
 function {:builtin "seq.extract"} Extract(v: Vec, offset: int, length: int): Vec;
 
-// nth
-function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
-
 // length
 function {:builtin "seq.len"} Len(v: Vec): int;
+
+// nth
+function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
+axiom {:ctor "Vec"} (forall x: Vec,xx:Vec :: {Len(x),Len(xx)} ((Len(x) == Len(xx) && (forall i: int :: ((0 <= i && i < Len(x)) ==> (Nth(x,i)==Nth(xx, i)))))==>(x==xx)));
 
 ////////////////////////////////////////////////////////
 // Extending the theory with more definable functions //
@@ -84,7 +85,6 @@ ensures Nth(s, x) <= Nth(s, y);
 // The following tests are temporarilly commented out //
 ////////////////////////////////////////////////////////
 
-// procedure lookup(s: Vec int, x: int) returns (b: bool)
 // procedure lookup(s: Vec, x: int) returns (b: bool)
 // ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
 // {
@@ -103,14 +103,14 @@ ensures Nth(s, x) <= Nth(s, y);
 //     i := i + 1;
 //   }
 // }
-// 
-//  // procedure equality(s: Vec int, s': Vec int)
-//  procedure equality(s: Vec, s': Vec)
-//  requires Len(s) == Len(s');
-//  requires (forall i: int :: 0 <= i && i < Len(s) ==> Nth(s, i) == Nth(s', i));
-//  ensures s == s';
-//  {
-//  }
+
+ // procedure equality(s: Vec int, s': Vec int)
+ procedure equality(s: Vec, s': Vec)
+ requires Len(s) == Len(s');
+ requires (forall i: int :: 0 <= i && i < Len(s) ==> Nth(s, i) == Nth(s', i));
+ ensures s == s';
+ {
+ }
  
 // // procedure update(s: Vec int, pos: int, val: int) returns (s': Vec int)
 // procedure update(s: Vec, pos: int, val: int) returns (s': Vec)
