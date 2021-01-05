@@ -25,6 +25,7 @@ function {:builtin "seq.extract"} Extract(v: Vec, offset: int, length: int): Vec
 
 // length
 function {:builtin "seq.len"} Len(v: Vec): int;
+axiom {:ctor "Vec"} (forall x: Vec ::  Len(x) >= 0);
 
 // nth
 function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
@@ -85,24 +86,6 @@ ensures Nth(s, x) <= Nth(s, y);
 // The following tests are temporarilly commented out //
 ////////////////////////////////////////////////////////
 
-// procedure lookup(s: Vec, x: int) returns (b: bool)
-// ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
-// {
-//   var i: int;
-// 
-//   b := false;
-//   i := 0;
-//   while (i < Len(s))
-//   invariant (forall u: int :: 0 <= u && u < i ==> x != Nth(s, u));
-//   invariant 0 <= i;
-//   {
-//     if (Nth(s, i) == x) {
-//       b := true;
-//       return;
-//     }
-//     i := i + 1;
-//   }
-// }
 
  // procedure equality(s: Vec int, s': Vec int)
  procedure equality(s: Vec, s': Vec)
@@ -112,27 +95,47 @@ ensures Nth(s, x) <= Nth(s, y);
  {
  }
  
-// // procedure update(s: Vec int, pos: int, val: int) returns (s': Vec int)
-// procedure update(s: Vec, pos: int, val: int) returns (s': Vec)
-// requires 0 <= pos && pos < Len(s);
-// requires Nth(s, pos) == val;
-// ensures s' == s;
-// {
-//   s' := Update(s, pos, val);
-// }
+ // procedure update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+ procedure update(s: Vec, pos: int, val: int) returns (s': Vec)
+ requires 0 <= pos && pos < Len(s);
+ requires Nth(s, pos) == val;
+ ensures s' == s;
+ {
+   s' := Update(s, pos, val);
+ }
+
+
+//  procedure lookup(s: Vec, x: int) returns (b: bool)
+//  ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
+//  {
+//    var i: int;
+//  
+//    b := false;
+//    i := 0;
+//    while (i < Len(s))
+//    invariant (forall u: int :: 0 <= u && u < i ==> x != Nth(s, u));
+//    invariant 0 <= i;
+//    {
+//      if (Nth(s, i) == x) {
+//        b := true;
+//        return;
+//      }
+//      i := i + 1;
+//    }
+//  }
+
 // 
-// // procedure sorted_update(s: Vec int, pos: int, val: int) returns (s': Vec int)
-// procedure sorted_update(s: Vec, pos: int, val: int) returns (s': Vec)
-// requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
-// requires 0 <= pos && pos < Len(s);
-// requires (forall i: int:: 0 <= i && i < pos ==> Nth(s, i) <= val);
-// requires (forall i: int :: pos < i && i < Len(s) ==> val <= Nth(s, i));
-// ensures (forall i, j: int :: 0 <= i && i <= j && j < Len(s') ==> Nth(s', i) <= Nth(s', j));
-// {
-//   s' := Update(s, pos, val);
-// }
+ // procedure sorted_update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+//  procedure sorted_update(s: Vec, pos: int, val: int) returns (s': Vec)
+//  requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
+//  requires 0 <= pos && pos < Len(s);
+//  requires (forall i: int:: 0 <= i && i < pos ==> Nth(s, i) <= val);
+//  requires (forall i: int :: pos < i && i < Len(s) ==> val <= Nth(s, i));
+//  ensures (forall i, j: int :: 0 <= i && i <= j && j < Len(s') ==> Nth(s', i) <= Nth(s', j));
+//  {
+//    s' := Update(s, pos, val);
+//  }
 // 
-// // procedure sorted_insert(s: Vec int, x: int) returns (s': Vec int)
 // procedure sorted_insert(s: Vec, x: int) returns (s': Vec)
 // requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
 // ensures (forall i, j: int :: 0 <= i && i <= j && j < Len(s') ==> Nth(s', i) <= Nth(s', j));
@@ -161,7 +164,12 @@ ensures Nth(s, x) <= Nth(s, y);
 //   }
 //   s' := Append(s', val);
 // }
-// 
+
+
+///////////////////////////////////////////////
+// datatypes as values -- currently skipped  //
+///////////////////////////////////////////////
+
 // // type {:datatype} Value;
 // // function {:constructor} Integer(i: int): Value;
 // // function {:constructor} Vector(v: Vec Value): Value;
