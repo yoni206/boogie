@@ -116,8 +116,10 @@ ensures Nth(s, x) <= Nth(s, y);
 
 
   procedure lookup(s: Vec, x: int) returns (b: bool)
-   // ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
-   ensures b == ContainsElem(s, x);
+   // old ensures:
+   //  ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
+   // new ensures: ltr ok. rtl not.
+    ensures b == ContainsElem(s, x);
   {
     var i: int;
   
