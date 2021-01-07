@@ -1,3 +1,4 @@
+// run locally: Source/BoogieDriver/bin/Debug/netcoreapp3.1/BoogieDriver Test/sequences/intseq_vector.bpl -useArrayTheory -lib -monomorphize /env:2 /proverLog:tmp_cvc4.smt2 /proverOpt:PROVER_PATH=/home/yoniz/git/CVC4_1/builds/production/bin/cvc4 /proverOpt:O:strings-exp=true /proverOpt:SOLVER=CVC4 /trace
 // RUN: %boogie -useArrayTheory -lib -monomorphize "%s" > "%t"
 // RUN: %diff "%s.expect" "%t"
 
@@ -25,7 +26,9 @@ function {:builtin "seq.extract"} Extract(v: Vec, offset: int, length: int): Vec
 
 // length
 function {:builtin "seq.len"} Len(v: Vec): int;
-axiom {:ctor "Vec"} (forall x: Vec ::  Len(x) >= 0);
+
+// contains
+function {:builtin "seq.contains"} Contains(v: Vec, u: Vec): bool;
 
 // nth
 function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
@@ -34,6 +37,13 @@ axiom {:ctor "Vec"} (forall x: Vec,xx:Vec :: {Len(x),Len(xx)} ((Len(x) == Len(xx
 ////////////////////////////////////////////////////////
 // Extending the theory with more definable functions //
 ////////////////////////////////////////////////////////
+
+// contains_elem via contains and unit
+function {:inline} ContainsElem(v: Vec, x: int): bool
+{
+  Contains(v, Unit(x))
+}
+axiom {:ctor "Vec"} (forall s: Vec, x: int :: {Len(s), ContainsElem(s, x)} (exists i : int :: {Nth(s,i)} (0<= i && i < Len(s) && Nth(s, i) == x)) == ContainsElem(s, x) );
 
 // append (via concat and unit)
 function {:inline} Append(v: Vec, x: int) : Vec 
@@ -105,24 +115,25 @@ ensures Nth(s, x) <= Nth(s, y);
  }
 
 
-//  procedure lookup(s: Vec, x: int) returns (b: bool)
-//  ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
-//  {
-//    var i: int;
-//  
-//    b := false;
-//    i := 0;
-//    while (i < Len(s))
-//    invariant (forall u: int :: 0 <= u && u < i ==> x != Nth(s, u));
-//    invariant 0 <= i;
-//    {
-//      if (Nth(s, i) == x) {
-//        b := true;
-//        return;
-//      }
-//      i := i + 1;
-//    }
-//  }
+  procedure lookup(s: Vec, x: int) returns (b: bool)
+   // ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
+   ensures b == ContainsElem(s, x);
+  {
+    var i: int;
+  
+    b := false;
+    i := 0;
+    while (i < Len(s))
+    invariant (forall u: int :: 0 <= u && u < i ==> x != Nth(s, u));
+    invariant 0 <= i;
+    {
+      if (Nth(s, i) == x) {
+        b := true;
+        return;
+      }
+      i := i + 1;
+    }
+  }
 
 // 
  // procedure sorted_update(s: Vec int, pos: int, val: int) returns (s': Vec int)
