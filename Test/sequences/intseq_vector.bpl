@@ -119,7 +119,7 @@ ensures Nth(s, x) <= Nth(s, y);
 
   procedure lookup(s: Vec, x: int) returns (b: bool)
    //  ltr ok. rtl not times out
-    ensures b ==> ContainsElem(s, x);
+    ensures b == ContainsElem(s, x);
   {
     var i: int;
   
