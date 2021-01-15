@@ -5,6 +5,8 @@
 //////////////////////
 // type declaration //
 //////////////////////
+// TODO: how can I support Vec<T> like in monomorphize/vector.bpl ? 
+// type {:builtin "(Seq " + T.toString() + ")"} Vec<T> ?}
 type {:builtin "(Seq Int)"} Vec;
 
 ///////////////////////////////////////////
