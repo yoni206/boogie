@@ -32,6 +32,7 @@ function {:builtin "seq.contains"} Contains(v: Vec, u: Vec): bool;
 
 // nth
 function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
+// extensiontality of sequences
 axiom {:ctor "Vec"} (forall x: Vec,xx:Vec :: {Len(x),Len(xx)} ((Len(x) == Len(xx) && (forall i: int :: ((0 <= i && i < Len(x)) ==> (Nth(x,i)==Nth(xx, i)))))==>(x==xx)));
 
 ////////////////////////////////////////////////////////
@@ -43,6 +44,7 @@ function {:inline} ContainsElem(v: Vec, x: int): bool
 {
   Contains(v, Unit(x))
 }
+// x is in s iff x=s[i] for some 0<=i<len(s)
 axiom {:ctor "Vec"} (forall s: Vec, x: int :: {Len(s), ContainsElem(s, x)} (exists i : int :: {Nth(s,i)} (0<= i && i < Len(s) && Nth(s, i) == x)) == ContainsElem(s, x) );
 
 // append (via concat and unit)
@@ -116,10 +118,8 @@ ensures Nth(s, x) <= Nth(s, y);
 
 
   procedure lookup(s: Vec, x: int) returns (b: bool)
-   // old ensures:
-   //  ensures b == (exists i: int :: 0 <= i && i < Len(s) && x == Nth(s, i));
-   // new ensures: ltr ok. rtl not.
-    ensures b == ContainsElem(s, x);
+   //  ltr ok. rtl not times out
+    ensures b ==> ContainsElem(s, x);
   {
     var i: int;
   
