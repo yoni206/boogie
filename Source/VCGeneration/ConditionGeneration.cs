@@ -238,7 +238,7 @@ namespace VC
         debugWriter.WriteLine("Effective precondition:");
       }
 
-      Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+      Substitution formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
       string blockLabel = "PreconditionGeneratedEntry";
 
       Block origStartBlock = impl.Blocks[0];
@@ -303,7 +303,7 @@ namespace VC
         debugWriter.WriteLine("Effective postcondition:");
       }
 
-      Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+      Substitution formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
 
       // (free and checked) ensures clauses
       foreach (Ensures ens in impl.Proc.Ensures)
@@ -350,7 +350,7 @@ namespace VC
         debugWriter.WriteLine("Effective precondition:");
       }
 
-      Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+      Substitution formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
       List<Cmd> pre = new List<Cmd>();
 
       // (free and checked) requires clauses
@@ -392,7 +392,7 @@ namespace VC
       }
 
       // Construct an Expr for the post-condition
-      Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+      Substitution formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
       List<Cmd> post = new List<Cmd>();
       foreach (Ensures ens in impl.Proc.Ensures)
       {
@@ -440,7 +440,7 @@ namespace VC
         debugWriter.WriteLine("Effective precondition from where-clauses:");
       }
 
-      Substitution formalProcImplSubst = Substituter.SubstitutionFromHashtable(impl.GetImplFormalMap());
+      Substitution formalProcImplSubst = Substituter.SubstitutionFromDictionary(impl.GetImplFormalMap());
       List<Cmd> whereClauses = new List<Cmd>();
 
       // where clauses of in-parameters
@@ -624,7 +624,7 @@ namespace VC
       }
     }
 
-    protected static void EmitImpl(Implementation impl, bool printDesugarings)
+    public static void EmitImpl(Implementation impl, bool printDesugarings)
     {
       Contract.Requires(impl != null);
       int oldPrintUnstructured = CommandLineOptions.Clo.PrintUnstructured;
@@ -705,24 +705,12 @@ namespace VC
       foreach (Block b in blocks)
       {
         Contract.Assert(b != null);
-        foreach (Block ch in Exits(b))
+        foreach (Block ch in b.Exits())
         {
           Contract.Assert(ch != null);
           ch.Predecessors.Add(b);
         }
       }
-    }
-
-    protected static IEnumerable Exits(Block b)
-    {
-      Contract.Requires(b != null);
-      GotoCmd g = b.TransferCmd as GotoCmd;
-      if (g != null)
-      {
-        return cce.NonNull(g.labelTargets);
-      }
-
-      return new List<Block>();
     }
 
     protected Variable CreateIncarnation(Variable x, Absy a)
@@ -911,7 +899,7 @@ namespace VC
         ChecksumHelper.ComputeChecksums(c, currentImplementation, variableCollector.UsedVariables, currentChecksum);
         variableCollector.Visit(c);
         currentChecksum = c.Checksum;
-        TurnIntoPassiveCmd(c, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
+        TurnIntoPassiveCmd(c, b, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
       }
 
       b.Checksum = currentChecksum;
@@ -920,7 +908,7 @@ namespace VC
       if (b.TransferCmd is ReturnExprCmd)
       {
         ReturnExprCmd rec = (ReturnExprCmd) b.TransferCmd.Clone();
-        Substitution incarnationSubst = Substituter.SubstitutionFromHashtable(incarnationMap);
+        Substitution incarnationSubst = Substituter.SubstitutionFromDictionary(incarnationMap);
         rec.Expr = Substituter.ApplyReplacingOldExprs(incarnationSubst, oldFrameSubst, rec.Expr);
         b.TransferCmd = rec;
       }
@@ -1101,7 +1089,7 @@ namespace VC
           oldFrameMap.Add(ie.Decl, ie);
       }
 
-      return Substituter.SubstitutionFromHashtable(oldFrameMap);
+      return Substituter.SubstitutionFromDictionary(oldFrameMap);
     }
 
     public enum CachingAction : byte
@@ -1180,20 +1168,24 @@ namespace VC
     }
     
     /// <summary>
-    /// Turn a command into a passive command, and it remembers the previous step, to see if it is a havoc or not. In the case, it remembers the incarnation map BEFORE the havoc
+    /// Turn a command into a passive command, and it remembers the previous step, to see if it is a havoc or not.
+    /// In that case, it remembers the incarnation map BEFORE the havoc.
     /// Meanwhile, record any information needed to later reconstruct a model view.
     /// </summary>
-    protected void TurnIntoPassiveCmd(Cmd c, Dictionary<Variable, Expr> incarnationMap, Substitution oldFrameSubst,
+    protected void TurnIntoPassiveCmd(Cmd c, Block enclosingBlock, Dictionary<Variable, Expr> incarnationMap, Substitution oldFrameSubst,
       List<Cmd> passiveCmds, ModelViewInfo mvInfo)
     {
       Contract.Requires(c != null);
+      Contract.Requires(enclosingBlock != null);
       Contract.Requires(incarnationMap != null);
       Contract.Requires(oldFrameSubst != null);
       Contract.Requires(passiveCmds != null);
       Contract.Requires(mvInfo != null);
 
       AddDebugInfo(c, incarnationMap, passiveCmds);
-      Substitution incarnationSubst = Substituter.SubstitutionFromHashtable(incarnationMap);
+      Substitution incarnationSubst = Substituter.SubstitutionFromDictionary(incarnationMap);
+      
+      QuantifierInstantiationEngine.SubstituteIncarnationInInstantiationSources(c, incarnationSubst);
 
       #region assert/assume P |--> assert/assume P[x := in(x)], out := in
 
@@ -1229,7 +1221,7 @@ namespace VC
         }
 
         Expr copy = Substituter.ApplyReplacingOldExprs(incarnationSubst, oldFrameSubst, pc.Expr);
-        if (CommandLineOptions.Clo.ModelViewFile != null && pc is AssumeCmd)
+        if (CommandLineOptions.Clo.ModelViewFile != null && pc is AssumeCmd captureStateAssumeCmd)
         {
           string description = QKeyValue.FindStringAttribute(pc.Attributes, "captureState");
           if (description != null)
@@ -1238,8 +1230,13 @@ namespace VC
               new List<Expr>
                 {Expr.Ident(ModelViewInfo.MVState_ConstantDef), Expr.Literal(mvInfo.CapturePoints.Count)});
             copy = Expr.And(mv, copy);
-            mvInfo.CapturePoints.Add(new ModelViewInfo.Mapping(description,
-              new Dictionary<Variable, Expr>(incarnationMap)));
+            if (!mvInfo.BlockToCapturePointIndex.TryGetValue(enclosingBlock, out var points)) {
+              points = new List<(AssumeCmd, ModelViewInfo.Mapping)>();
+              mvInfo.BlockToCapturePointIndex[enclosingBlock] = points;
+            }
+            var mapping = new ModelViewInfo.Mapping(description, new Dictionary<Variable, Expr>(incarnationMap));
+            points.Add((captureStateAssumeCmd, mapping));
+            mvInfo.CapturePoints.Add(mapping);
           }
         }
 
@@ -1520,7 +1517,7 @@ namespace VC
         }
 
         // Then, perform the assume of the where clauses, using the updated incarnations
-        Substitution updatedIncarnationSubst = Substituter.SubstitutionFromHashtable(incarnationMap);
+        Substitution updatedIncarnationSubst = Substituter.SubstitutionFromDictionary(incarnationMap);
         foreach (IdentifierExpr ie in havocVars)
         {
           Contract.Assert(ie != null);
@@ -1555,19 +1552,16 @@ namespace VC
       {
         // comments are just for debugging and don't affect verification
       }
-      else if (c is SugaredCmd)
+      else if (c is SugaredCmd sug)
       {
-        SugaredCmd sug = (SugaredCmd) c;
-        Contract.Assert(sug != null);
         Cmd cmd = sug.Desugaring;
         Contract.Assert(cmd != null);
-        TurnIntoPassiveCmd(cmd, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
+        TurnIntoPassiveCmd(cmd, enclosingBlock, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
       }
-      else if (c is StateCmd)
+      else if (c is StateCmd st)
       {
         this.preHavocIncarnationMap = null; // we do not need to remember the previous incarnations
-        StateCmd st = (StateCmd) c;
-        Contract.Assert(st != null);
+        
         // account for any where clauses among the local variables
         foreach (Variable v in st.Locals)
         {
@@ -1583,7 +1577,7 @@ namespace VC
         foreach (Cmd s in st.Cmds)
         {
           Contract.Assert(s != null);
-          TurnIntoPassiveCmd(s, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
+          TurnIntoPassiveCmd(s, enclosingBlock, incarnationMap, oldFrameSubst, passiveCmds, mvInfo);
         }
 
         // remove the local variables from the incarnation map
