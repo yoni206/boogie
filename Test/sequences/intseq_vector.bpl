@@ -35,10 +35,6 @@ function {:builtin "seq.contains"} Contains(v: Vec, u: Vec): bool;
 // nth
 function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
 
-// extensiontality of sequences
-// needed for `procedure equality`
-axiom {:ctor "Vec"} (forall x: Vec,xx:Vec :: {Len(x),Len(xx)} ((Len(x) == Len(xx) && (forall i: int :: ((0 <= i && i < Len(x)) ==> (Nth(x,i)==Nth(xx, i)))))==>(x==xx)));
-
 ////////////////////////////////////////////////////////
 // Extending the theory with more definable functions //
 ////////////////////////////////////////////////////////
@@ -95,21 +91,13 @@ ensures Nth(s, x) <= Nth(s, y);
 {
 }
 
-
-////////////////////////////////////////////////////////
-// The following tests are temporarilly commented out //
-////////////////////////////////////////////////////////
-
-
- // procedure equality(s: Vec int, s': Vec int)
- procedure equality(s: Vec, s': Vec)
- requires Len(s) == Len(s');
- requires (forall i: int :: 0 <= i && i < Len(s) ==> Nth(s, i) == Nth(s', i));
- ensures s == s';
- {
- }
- 
- // procedure update(s: Vec int, pos: int, val: int) returns (s': Vec int)
+  procedure equality(s: Vec, s': Vec)
+  requires Len(s) == Len(s');
+  requires (forall i: int :: 0 <= i && i < Len(s) ==> Nth(s, i) == Nth(s', i));
+  ensures s == s';
+  {
+  }
+  
  procedure update(s: Vec, pos: int, val: int) returns (s': Vec)
  requires 0 <= pos && pos < Len(s);
  requires Nth(s, pos) == val;
@@ -121,7 +109,7 @@ ensures Nth(s, x) <= Nth(s, y);
 
   procedure lookup(s: Vec, x: int) returns (b: bool)
    //  ltr ok. rtl not times out
-    ensures b ==> ContainsElem(s, x);
+    ensures b <== ContainsElem(s, x);
   {
     var i: int;
   
@@ -140,7 +128,6 @@ ensures Nth(s, x) <= Nth(s, y);
   }
 
 // 
- // procedure sorted_update(s: Vec int, pos: int, val: int) returns (s': Vec int)
 //  procedure sorted_update(s: Vec, pos: int, val: int) returns (s': Vec)
 //  requires (forall i, j: int :: 0 <= i && i <= j && j < Len(s) ==> Nth(s, i) <= Nth(s, j));
 //  requires 0 <= pos && pos < Len(s);

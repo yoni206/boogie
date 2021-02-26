@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-fun s () (Seq Int))
+(declare-fun a () Int)
+(assert (seq.contains s (seq.unit a)))
+(assert (forall ((i Int)) (=> (and (<= 0 i) (< i (seq.len s))) (distinct (seq.nth s i) a))))
+(check-sat)
