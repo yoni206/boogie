@@ -35,6 +35,10 @@ function {:builtin "seq.contains"} Contains(v: Vec, u: Vec): bool;
 // nth
 function {:builtin "seq.nth"} Nth(v: Vec, i: int): int;
 
+// override
+function {:builtin "seq.update"} Override(v: Vec, i: int, u: Vec): Vec;
+
+
 ////////////////////////////////////////////////////////
 // Extending the theory with more definable functions //
 ////////////////////////////////////////////////////////
@@ -54,7 +58,8 @@ function {:inline} Append(v: Vec, x: int) : Vec
 // update (via concat, extract and unit)
 function {:inline} Update(v: Vec, i: int, x: int): Vec
 {
-  Concat3(Extract(v, 0, i), Unit(x), Extract(v, i+1, Len(v) - i - 1))
+  Override(v, i, Unit(x))
+
 }
 
 
